@@ -277,6 +277,12 @@ enum AsyncStatus {
   Error,
 }
 
+[uuid(30D5A829-7FA4-4026-83BB-D75BAE4EA99E)]
+interface IClosable : IInspectable
+{
+    HRESULT Close();
+}
+
 [uuid(A4ED5C81-76C9-40BD-8BE6-B1D90FB20AE7)]
 interface IAsyncActionCompletedHandler : IUnknown
 {

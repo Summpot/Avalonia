@@ -2,21 +2,25 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
-using System.Threading.Tasks;
+using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using Avalonia.Logging;
 using Avalonia.MicroCom;
 using Avalonia.OpenGL.Egl;
 using Avalonia.Rendering;
+using Avalonia.Win32.Direct3D12;
+using Avalonia.Win32.DirectX;
 using Avalonia.Win32.Interop;
 using MicroCom.Runtime;
 
 namespace Avalonia.Win32.WinRT.Composition;
 
-internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFactory
+internal class WinUiCompositorConnection : IRenderTimer, ID3D12DrawingSurfaceFactory, IWindowsCompositionConnection
 {
     private readonly WinUiCompositionShared _shared;
     private readonly AutoResetEvent _wakeEvent = new(false);
+    private readonly WindowsCompositionThread _thread;
+    private volatile IntPtr _loopWindow;
     private volatile bool _stopped = true;
     private volatile Action<TimeSpan>? _tick;
 
@@ -41,8 +45,9 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
         }
     }
 
-    public WinUiCompositorConnection()
+    private WinUiCompositorConnection(WindowsCompositionThread thread)
     {
+        _thread = thread;
         using var compositor = NativeWinRTMethods.CreateInstance<ICompositor>("Windows.UI.Composition.Compositor");
         /*
         var levels = new[] { D3D_FEATURE_LEVEL.D3D_FEATURE_LEVEL_11_1 };
@@ -63,41 +68,35 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
         _shared = new WinUiCompositionShared(compositor);
     }
 
-    private static bool TryCreateAndRegisterCore()
+    private static WinUiCompositorConnection CreateCore()
     {
-        var tcs = new TaskCompletionSource<bool>();
-        var th = new Thread(() =>
-        {
-            WinUiCompositorConnection connect;
-            try
+        WinRTDispatcherQueue? dispatcher = null;
+        return WindowsCompositionThread.Start(
+            thread =>
             {
-                NativeWinRTMethods.CreateDispatcherQueueController(new NativeWinRTMethods.DispatcherQueueOptions
+                dispatcher = new WinRTDispatcherQueue();
+                return new WinUiCompositorConnection(thread);
+            },
+            connection => connection.RunLoop(),
+            connection =>
+            {
+                try
                 {
-                    apartmentType = NativeWinRTMethods.DISPATCHERQUEUE_THREAD_APARTMENTTYPE.DQTAT_COM_NONE,
-                    dwSize = Marshal.SizeOf<NativeWinRTMethods.DispatcherQueueOptions>(),
-                    threadType = NativeWinRTMethods.DISPATCHERQUEUE_THREAD_TYPE.DQTYPE_THREAD_CURRENT
-                });
-                connect = new WinUiCompositorConnection();
-                AvaloniaLocator.CurrentMutable.Bind<IWindowsSurfaceFactory>().ToConstant(connect);
-                AvaloniaLocator.CurrentMutable.Bind<IRenderLoop>().ToConstant(RenderLoop.FromTimer(connect));
-                tcs.SetResult(true);
-
-            }
-            catch (Exception e)
-            {
-                tcs.SetException(e);
-                return;
-            }
-
-            connect.RunLoop();
-        })
-        {
-            IsBackground = true,
-            Name = "DwmRenderTimerLoop"
-        };
-        th.SetApartmentState(ApartmentState.STA);
-        th.Start();
-        return tcs.Task.Result;
+                    connection?._shared.Dispose();
+                }
+                finally
+                {
+                    try
+                    {
+                        dispatcher?.Dispose();
+                    }
+                    finally
+                    {
+                        connection?._wakeEvent.Dispose();
+                    }
+                }
+            },
+            connection => connection.Wake());
     }
 
     private class RunLoopHandler : CallbackBase, IAsyncActionCompletedHandler
@@ -117,7 +116,8 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
         {
             lock (_parent._shared.SyncRoot)
             {
-                if (_currentCommit == null || _currentCommit.GetNativeIntPtr() != asyncInfo.GetNativeIntPtr())
+                if (_parent._thread.CancellationToken.IsCancellationRequested
+                    || _currentCommit == null || _currentCommit.GetNativeIntPtr() != asyncInfo.GetNativeIntPtr())
                     return;
                 OnCommitCompleted();
             }
@@ -145,9 +145,9 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
 
             _commitCompleted = false;
 
-            if (_parent._stopped)
+            if (_parent._stopped && !_parent._thread.CancellationToken.IsCancellationRequested)
             {
-                _parent._wakeEvent.WaitOne();
+                WaitHandle.WaitAny([_parent._wakeEvent, _parent._thread.CancellationToken.WaitHandle]);
                 // Reset the expected commit callback time since we've paused
                 // the render loop due to app being idle
                 _commitDueAt = _st.Elapsed + TimeSpan.FromSeconds(1);
@@ -197,15 +197,60 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
             lock (_parent._shared.SyncRoot)
                 ScheduleNextCommit();
         }
+
+        public void Stop()
+        {
+            lock (_parent._shared.SyncRoot)
+            {
+                _currentCommit?.Dispose();
+                _currentCommit = null;
+            }
+        }
+    }
+
+    public void Publish()
+    {
+        AvaloniaLocator.CurrentMutable.Bind<IWindowsSurfaceFactory>().ToConstant(this);
+        AvaloniaLocator.CurrentMutable.Bind<IRenderLoop>().ToConstant(RenderLoop.FromTimer(this));
+    }
+
+    public void Stop() => _thread.Stop();
+
+    private void Wake()
+    {
+        _wakeEvent.Set();
+        // Wakes the message loop immediately; the watchdog timer would otherwise wake it within a second.
+        var window = _loopWindow;
+        if (window != IntPtr.Zero)
+            UnmanagedMethods.PostMessage(window, (uint)UnmanagedMethods.WindowsMessage.WM_NULL, IntPtr.Zero, IntPtr.Zero);
     }
 
     private void RunLoop()
     {
-        var cts = new CancellationTokenSource();
-        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
-            cts.Cancel();
-
+        var cancellation = _thread.CancellationToken;
         var handler = new RunLoopHandler(this);
+        try
+        {
+            RunMessageLoop(handler, cancellation);
+        }
+        finally
+        {
+            _loopWindow = IntPtr.Zero;
+            try
+            {
+                handler.Stop();
+            }
+            finally
+            {
+                handler.Dispose();
+            }
+        }
+    }
+
+    private void RunMessageLoop(RunLoopHandler handler, CancellationToken cancellation)
+    {
+        if (cancellation.IsCancellationRequested)
+            return;
         handler.Start();
 
         const int watchDogIntervalInMs = 1000;
@@ -220,13 +265,16 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
             return UnmanagedMethods.DefWindowProc(hwnd, msg, w, l);
         });
         UnmanagedMethods.SetTimer(dw.Handle, IntPtr.Zero, watchDogIntervalInMs, null);
+        _loopWindow = dw.Handle;
+        if (cancellation.IsCancellationRequested)
+            UnmanagedMethods.PostMessage(dw.Handle, (uint)UnmanagedMethods.WindowsMessage.WM_NULL, IntPtr.Zero, IntPtr.Zero);
 
         // Warning: the completion callback (RunLoopHandler.Invoke) from ICompositor5.RequestCommitAsync()
         // is called in DispatchMessage() on Windows 10, but in GetMessage() on Windows 11!
         // Be careful when changing the scope of the shared lock.
 
         var result = 0;
-        while (!cts.IsCancellationRequested
+        while (!cancellation.IsCancellationRequested
                && (result = UnmanagedMethods.GetMessage(out var msg, IntPtr.Zero, 0, 0)) > 0)
         {
             UnmanagedMethods.DispatchMessage(ref msg);
@@ -247,12 +295,20 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
 
     public static bool TryCreateAndRegister()
     {
+        if (TryCreate() is not { } connection)
+            return false;
+
+        connection.Publish();
+        return true;
+    }
+
+    public static WinUiCompositorConnection? TryCreate()
+    {
         if (IsSupported())
         {
             try
             {
-                TryCreateAndRegisterCore();
-                return true;
+                return CreateCore();
             }
             catch (Exception e)
             {
@@ -269,9 +325,24 @@ internal class WinUiCompositorConnection : IRenderTimer, Win32.IWindowsSurfaceFa
                 $"Unable to initialize WinUI compositor: {osVersionNotice}");
         }
 
-        return false;
+        return null;
     }
 
     public bool RequiresNoRedirectionBitmap => true;
-    public IPlatformRenderSurface CreateSurface(EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo info) => new WinUiCompositedWindowSurface(_shared, info);
+
+    public D3D12DrawingSurfaceCapabilities ProbeDrawingSurface(D3D12PlatformGraphics graphics) =>
+        D3D12DrawingSurfaceProbe.ProbeWinUi(_shared.Compositor, graphics);
+
+    public IPlatformRenderSurface CreateSurface(EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo info)
+    {
+        if (AvaloniaLocator.Current.GetService<IPlatformGraphics>() is D3D12PlatformGraphics d3d12)
+        {
+            var useSwapChain = AvaloniaLocator.Current.GetService<Win32PlatformOptions>()?.UseCompositionSwapChain ?? false;
+            if (useSwapChain)
+                return D3D12CompositionWindowSurface.CreateWinUi(_shared, info, d3d12);
+            return D3D12DrawingSurfaceWindowSurface.CreateWinUi(_shared, info, d3d12);
+        }
+
+        return new WinUiCompositedWindowSurface(_shared, info);
+    }
 }

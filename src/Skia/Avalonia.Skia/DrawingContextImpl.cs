@@ -85,6 +85,9 @@ namespace Avalonia.Skia
             public ISkiaGpu? Gpu;
 
             public ISkiaGpuRenderSession? CurrentSession;
+
+            /// <summary>Device-space transform retained when callers replace <see cref="Transform"/>.</summary>
+            public Matrix? PostTransform;
         }
 
         private class SkiaLeaseFeature : ISkiaSharpApiLeaseFeature
@@ -197,13 +200,14 @@ namespace Avalonia.Skia
             Surface = createInfo.Surface;
 
             _session = createInfo.CurrentSession;
+            _postTransform = createInfo.PostTransform;
 
             
             if (createInfo.ScaleDrawingToDpi && !createInfo.Dpi.NearlyEquals(SkiaPlatform.DefaultDpi))
             {
                 _postTransform =
                     Matrix.CreateScale(createInfo.Dpi.X / SkiaPlatform.DefaultDpi.X,
-                        createInfo.Dpi.Y / SkiaPlatform.DefaultDpi.Y);
+                        createInfo.Dpi.Y / SkiaPlatform.DefaultDpi.Y) * (createInfo.PostTransform ?? Matrix.Identity);
             }
 
             Transform = Matrix.Identity;

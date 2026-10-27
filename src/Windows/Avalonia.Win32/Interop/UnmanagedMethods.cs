@@ -1777,6 +1777,16 @@ namespace Avalonia.Win32.Interop
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
+
+        public const uint INFINITE = 0xFFFFFFFF;
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr CreateEventW(IntPtr lpEventAttributes, [MarshalAs(UnmanagedType.Bool)] bool bManualReset,
+            [MarshalAs(UnmanagedType.Bool)] bool bInitialState, string? lpName);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
         [DllImport("gdi32.dll")]
         public static extern IntPtr CreateDIBSection(IntPtr hDC, ref BITMAPINFOHEADER pBitmapInfo, DIBColorTable usage, out IntPtr lplpVoid, IntPtr handle, int dw);
         [DllImport("gdi32.dll")]
