@@ -205,6 +205,7 @@
   <Project Path="src/Avalonia.Controls/Avalonia.Controls.csproj" />
   <Project Path="src/Avalonia.DesignerSupport/Avalonia.DesignerSupport.csproj" />
   <Project Path="src/Avalonia.Dialogs/Avalonia.Dialogs.csproj" />
+  <Project Path="src/Avalonia.Direct3D12/Avalonia.Direct3D12.csproj" />
   <Project Path="src/Avalonia.Fonts.Inter/Avalonia.Fonts.Inter.csproj" />
   <Project Path="src/Avalonia.Metal/Avalonia.Metal.csproj" />
   <Project Path="src/Avalonia.MicroCom/Avalonia.MicroCom.csproj" />

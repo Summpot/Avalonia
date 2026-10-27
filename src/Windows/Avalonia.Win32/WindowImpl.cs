@@ -16,6 +16,7 @@ using Avalonia.OpenGL.Egl;
 using Avalonia.Platform;
 using Avalonia.Platform.Surfaces;
 using Avalonia.Platform.Storage;
+using Avalonia.Win32.Direct3D12;
 using Avalonia.Rendering.Composition;
 using Avalonia.Win32.DirectX;
 using Avalonia.Win32.Input;
@@ -147,8 +148,12 @@ namespace Avalonia.Win32
 
             var surfaceFactory = AvaloniaLocator.Current.GetService<IWindowsSurfaceFactory>();
             var glPlatform = AvaloniaLocator.Current.GetService<IPlatformGraphics>();
-            UseRedirectionBitmap = surfaceFactory is null || glPlatform is null ||
-                                   !surfaceFactory.RequiresNoRedirectionBitmap;
+            // D3D12 flip-model swapchains require WS_EX_NOREDIRECTIONBITMAP (set before CreateWindow).
+            if (glPlatform is D3D12PlatformGraphics)
+                UseRedirectionBitmap = false;
+            else
+                UseRedirectionBitmap = surfaceFactory is null || glPlatform is null ||
+                                       !surfaceFactory.RequiresNoRedirectionBitmap;
 
             _wmPointerEnabled = Win32Platform.WindowsVersion >= PlatformConstants.Windows8;
 
@@ -174,6 +179,8 @@ namespace Avalonia.Win32
                         _glSurface = new EglGlPlatformSurface(this);
                     else if (glPlatform is WglPlatformOpenGlInterface)
                         _glSurface = new WglGlPlatformSurface(this);
+                    else if (glPlatform is D3D12PlatformGraphics d3d12)
+                        _glSurface = new D3D12SwapchainWindowSurface(this, d3d12);
                 }
             }
 

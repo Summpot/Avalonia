@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Avalonia.OpenGL;
 using Avalonia.Platform;
@@ -21,14 +21,19 @@ public enum Win32RenderingMode
     AngleEgl = 2,
 
     /// <summary>
-    /// Avalonia would try to use native Widows OpenGL with GPU rendering.
+    /// Avalonia would try to use native Windows OpenGL with GPU rendering.
     /// </summary>
     Wgl = 3,
 
     /// <summary>
-    /// Avalonia would try to use native Widows Vulkan with GPU rendering.
+    /// Avalonia would try to use native Windows Vulkan with GPU rendering.
     /// </summary>
-    Vulkan = 4
+    Vulkan = 4,
+
+    /// <summary>
+    /// Avalonia would try to use native Windows Direct3D 12 with GPU rendering.
+    /// </summary>
+    Direct3D12 = 5
 }
 
 /// <summary>

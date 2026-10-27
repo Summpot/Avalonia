@@ -5,6 +5,7 @@ using Avalonia.OpenGL;
 using Avalonia.Platform;
 using Avalonia.Vulkan;
 using Avalonia.Win32.DComposition;
+using Avalonia.Win32.Direct3D12;
 using Avalonia.Win32.DirectX;
 using Avalonia.Win32.OpenGl;
 using Avalonia.Win32.OpenGl.Angle;
@@ -70,6 +71,17 @@ static class Win32GlManager
                 var vulkan = VulkanSupport.TryInitialize(AvaloniaLocator.Current.GetService<VulkanOptions>() ?? new());
                 if (vulkan != null)
                     return vulkan;
+            }
+
+            if (renderingMode == Win32RenderingMode.Direct3D12)
+            {
+                var d3d12 = D3D12PlatformGraphics.TryCreate();
+                if (d3d12 != null)
+                {
+                    // Flip-model DXGI swapchain requires WS_EX_NOREDIRECTIONBITMAP before CreateWindow.
+                    AvaloniaLocator.CurrentMutable.Bind<IWindowsSurfaceFactory>().ToConstant(d3d12);
+                    return d3d12;
+                }
             }
         }
 
