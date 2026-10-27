@@ -28,7 +28,13 @@ public enum Win32RenderingMode
     /// <summary>
     /// Avalonia would try to use native Widows Vulkan with GPU rendering.
     /// </summary>
-    Vulkan = 4
+    Vulkan = 4,
+
+    /// <summary>
+    /// Avalonia would try to use native Windows Direct3D 12 with GPU rendering.
+    /// </summary>
+    /// <seealso cref="Win32PlatformOptions.RenderingMode"/>
+    Direct3D12 = 5
 }
 
 /// <summary>
@@ -63,7 +69,8 @@ public enum Win32CompositionMode
     /// <remarks>
     /// Supported on Windows 10 build 17134 and above. Ignored on other versions.
     /// This is recommended option, as it allows window acrylic effects and high refresh rate rendering.<br/>
-    /// Can only be applied with <see cref="Win32PlatformOptions.RenderingMode"/>=<see cref="Win32RenderingMode.AngleEgl"/>.
+    /// Can be applied with <see cref="Win32PlatformOptions.RenderingMode"/>=<see cref="Win32RenderingMode.AngleEgl"/>
+    /// or <see cref="Win32RenderingMode.Direct3D12"/>.
     /// </remarks>
     WinUIComposition = 1,
 
@@ -72,7 +79,8 @@ public enum Win32CompositionMode
     /// </summary>
     /// <remarks>
     /// Supported on Windows 8 and above. Ignored on other versions.<br/>
-    /// Can only be applied with <see cref="Win32PlatformOptions.RenderingMode"/>=<see cref="Win32RenderingMode.AngleEgl"/>.
+    /// Can be applied with <see cref="Win32PlatformOptions.RenderingMode"/>=<see cref="Win32RenderingMode.AngleEgl"/>
+    /// or <see cref="Win32RenderingMode.Direct3D12"/>.
     /// </remarks>
     DirectComposition = 2,
 
@@ -88,10 +96,12 @@ public enum Win32CompositionMode
     LowLatencyDxgiSwapChain = 3,
 
     /// <summary>
-    /// The window renders to a redirection surface.
+    /// Selects window presentation without a composition visual.
     /// </summary>
     /// <remarks>
     /// This option is kept only for compatibility with older systems. Some Avalonia features might not work.
+    /// With <see cref="Win32RenderingMode.Direct3D12"/>, an opaque HWND swapchain presents the window
+    /// without a redirection bitmap. Other rendering modes use a redirection surface.
     /// </remarks>
     RedirectionSurface,
 }
@@ -113,6 +123,12 @@ public class Win32PlatformOptions
     /// </summary>
     /// <remarks>
     /// If application should work on as wide range of devices as possible, at least add <see cref="Win32RenderingMode.Software"/> as a fallback value.
+    /// <see cref="Win32RenderingMode.Direct3D12"/> with WinUI or DirectComposition renders directly into the composition
+    /// texture when the system supports it, and otherwise renders offscreen and copies into the drawing surface.
+    /// The choice is made when the graphics device is created or recreated.
+    /// If neither works during initial startup, the next composition mode is tried.
+    /// The next rendering mode is tried after all configured composition modes fail.
+    /// A failure during device recovery leaves the graphics context lost; it does not select another rendering mode.
     /// </remarks>
     /// <exception cref="System.InvalidOperationException">Thrown if no values were matched.</exception>
     public IReadOnlyList<Win32RenderingMode> RenderingMode { get; set; } = new[]
@@ -127,6 +143,9 @@ public class Win32PlatformOptions
     /// </summary>
     /// <remarks>
     /// If application should work on as wide range of devices as possible, at least add <see cref="Win32CompositionMode.RedirectionSurface"/> as a fallback value.
+    /// With <see cref="Win32RenderingMode.Direct3D12"/>, Acrylic and Mica require <see cref="Win32CompositionMode.WinUIComposition"/>;
+    /// <see cref="Win32CompositionMode.DirectComposition"/> supports no backdrop effects.
+    /// <see cref="Win32CompositionMode.RedirectionSurface"/> presents through an opaque swapchain, so the window cannot be transparent.
     /// </remarks>
     /// <exception cref="System.InvalidOperationException">Thrown if no values were matched.</exception>
     public IReadOnlyList<Win32CompositionMode> CompositionMode { get; set; } = new[]
@@ -139,8 +158,9 @@ public class Win32PlatformOptions
     /// <see cref="Win32CompositionMode.DirectComposition"/>, render into a DXGI flip-model swapchain attached
     /// as composition visual content instead of a composition drawing surface.
     /// This allows DWM to use optimized presentation modes (independent flip) for fullscreen windows
-    /// and reduces latency, at the cost of every window owning two full-size buffers and, on the
+    /// and reduces latency, at the cost of every window owning multiple full-size buffers and, on the
     /// WinUI composition path, looser visual synchronization during interactive resize.
+    /// Applies to <see cref="Win32RenderingMode.AngleEgl"/> and <see cref="Win32RenderingMode.Direct3D12"/>.
     /// The default value is null, which lets the framework decide (currently: disabled).
     /// </summary>
     public bool? UseCompositionSwapChain { get; set; }
@@ -182,8 +202,9 @@ public class Win32PlatformOptions
     public Win32DpiAwareness DpiAwareness { get; set; } = Win32DpiAwareness.PerMonitorDpiAware;
     
     /// <summary>
-    /// Specifies a callback method to be called when compositor needs to create a platform graphics device
-    /// Currently is only called for AngleEgl rendering mode when DirectX 11 is used
+    /// Specifies a callback called when the compositor needs to create a platform graphics device.
+    /// Called for <see cref="Win32RenderingMode.AngleEgl"/> when DirectX 11 is used and for <see cref="Win32RenderingMode.Direct3D12"/>.
+    /// The callback receives the available adapters, including software ones, and returns the index of the adapter to use.
     /// </summary>
     public Func<IReadOnlyList<PlatformGraphicsDeviceAdapterDescription>, int>?
         GraphicsAdapterSelectionCallback { get; set; }

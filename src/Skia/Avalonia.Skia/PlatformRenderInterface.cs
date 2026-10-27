@@ -1,12 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Avalonia.Direct3D12;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Media.TextFormatting;
 using Avalonia.Metal;
 using Avalonia.OpenGL;
 using Avalonia.Platform;
+using Avalonia.Skia.Direct3D12;
 using Avalonia.Skia.Metal;
 using Avalonia.Skia.Vulkan;
 using Avalonia.Vulkan;
@@ -42,6 +44,8 @@ namespace Avalonia.Skia
                 return new SkiaContext(new SkiaMetalGpu(metal, _maxResourceBytes, _useStencilBuffers));
             if (graphicsContext is IVulkanPlatformGraphicsContext vulkanContext)
                 return new SkiaContext(new VulkanSkiaGpu(vulkanContext, _maxResourceBytes, _useStencilBuffers));
+            if (graphicsContext is ID3D12PlatformGraphicsContext d3d12Context)
+                return new SkiaContext(new D3D12SkiaGpu(d3d12Context, _maxResourceBytes, _useStencilBuffers));
             throw new ArgumentException("Graphics context of type is not supported");
         }
 

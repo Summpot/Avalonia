@@ -29,6 +29,7 @@ namespace Avalonia.Skia
         private readonly Stack<RenderOptions> _renderOptionsStack = new();
         private readonly Stack<TextOptions> _textOptionsStack = new();
         private readonly Matrix? _postTransform;
+        private readonly Matrix? _postTransformInverted;
         private double _currentOpacity = 1.0f;
         private readonly bool _disableSubpixelTextRendering;
         private Matrix? _currentTransform;
@@ -43,6 +44,7 @@ namespace Avalonia.Skia
         private readonly ISkiaGpuRenderSession? _session;
         private bool _leased;
         private bool _useOpacitySaveLayer;
+        private readonly bool _disableSurfaceAccess;
 
         /// <summary>
         /// Context create info.
@@ -85,6 +87,12 @@ namespace Avalonia.Skia
             public ISkiaGpu? Gpu;
 
             public ISkiaGpuRenderSession? CurrentSession;
+
+            /// <summary>Origin of the drawable area in surface pixels.</summary>
+            public PixelPoint SurfaceOffset;
+
+            /// <summary>Restricts API leases to drawing without exposing the backing surface.</summary>
+            public bool DisableSurfaceAccess;
         }
 
         private class SkiaLeaseFeature : ISkiaSharpApiLeaseFeature
@@ -108,11 +116,23 @@ namespace Avalonia.Skia
                 private readonly SKMatrix _revertTransform;
                 private bool _isDisposed;
                 private bool _leased;
+                private readonly SKNWayCanvas? _drawingCanvas;
+                private readonly int _saveCount;
 
                 public ApiLease(DrawingContextImpl context)
                 {
                     _revertTransform = context.Canvas.TotalMatrix;
                     _context = context;
+                    if (context._disableSurfaceAccess)
+                    {
+                        // Forward drawing without exposing the backing surface through SKCanvas.Surface.
+                        var bounds = context.Canvas.DeviceClipBounds;
+                        _drawingCanvas = new SKNWayCanvas(Math.Max(1, bounds.Right), Math.Max(1, bounds.Bottom));
+                        _drawingCanvas.ClipRect(bounds);
+                        _drawingCanvas.SetMatrix(_revertTransform);
+                        _saveCount = context.Canvas.Save();
+                        _drawingCanvas.AddCanvas(context.Canvas);
+                    }
                     _context._leased = true;
                 }
 
@@ -128,11 +148,11 @@ namespace Avalonia.Skia
                     return rv;
                 }
 
-                public SKCanvas SkCanvas => CheckLease(_context.Canvas);
+                public SKCanvas SkCanvas => CheckLease(_drawingCanvas ?? _context.Canvas);
                 // GrContext is accessible during the lease since one might want to wrap native resources
                 // Into Skia ones
                 public GRContext? GrContext => _context.GrContext;
-                public SKSurface? SkSurface => CheckLease(_context.Surface);
+                public SKSurface? SkSurface => CheckLease(_context._disableSurfaceAccess ? null : _context.Surface);
                 public double CurrentOpacity => CheckLease(_context._currentOpacity);
 
 
@@ -140,6 +160,12 @@ namespace Avalonia.Skia
                 {
                     if (!_isDisposed)
                     {
+                        if (_drawingCanvas is not null)
+                        {
+                            _drawingCanvas.RemoveAll();
+                            _drawingCanvas.Dispose();
+                            _context.Canvas.RestoreToCount(_saveCount);
+                        }
                         _context.Canvas.SetMatrix(_revertTransform);
                         _context._leased = false;
                         _isDisposed = true;
@@ -195,16 +221,25 @@ namespace Avalonia.Skia
             if (_grContext != null)
                 Monitor.Enter(_grContext);
             Surface = createInfo.Surface;
+            _disableSurfaceAccess = createInfo.DisableSurfaceAccess;
 
             _session = createInfo.CurrentSession;
+            SurfaceOffset = createInfo.SurfaceOffset;
+            Matrix? postTransform = null;
+            if (SurfaceOffset != default)
+                postTransform = Matrix.CreateTranslation(SurfaceOffset.X, SurfaceOffset.Y);
 
             
             if (createInfo.ScaleDrawingToDpi && !createInfo.Dpi.NearlyEquals(SkiaPlatform.DefaultDpi))
             {
-                _postTransform =
+                postTransform =
                     Matrix.CreateScale(createInfo.Dpi.X / SkiaPlatform.DefaultDpi.X,
-                        createInfo.Dpi.Y / SkiaPlatform.DefaultDpi.Y);
+                        createInfo.Dpi.Y / SkiaPlatform.DefaultDpi.Y) * (postTransform ?? Matrix.Identity);
             }
+
+            _postTransform = postTransform;
+            if (postTransform is { } pt)
+                _postTransformInverted = pt.Invert();
 
             Transform = Matrix.Identity;
 
@@ -867,12 +902,23 @@ namespace Avalonia.Skia
             RestoreCanvas();
         }
 
+        internal PixelPoint SurfaceOffset { get; }
+
         /// <inheritdoc />
         public Matrix Transform
         {
             // There is a Canvas.TotalMatrix (non 4x4 overload), but internally it still uses 4x4 matrix.
             // We want to avoid SKMatrix4x4 -> SKMatrix -> Matrix conversion by directly going SKMatrix4x4 -> Matrix.
-            get { return _currentTransform ??= Canvas.TotalMatrix44.ToAvaloniaMatrix(); }
+            get
+            {
+                if (_currentTransform is { } transform)
+                    return transform;
+                transform = Canvas.TotalMatrix44.ToAvaloniaMatrix();
+                if (_postTransformInverted is { } postTransformInverted)
+                    transform *= postTransformInverted;
+                _currentTransform = transform;
+                return transform;
+            }
             set
             {
                 CheckLease();

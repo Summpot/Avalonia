@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Platform;
+using SkiaSharp;
 
 namespace Avalonia.Skia
 {
@@ -38,8 +39,13 @@ namespace Avalonia.Skia
                 Dpi = SkiaPlatform.DefaultDpi * session.ScaleFactor,
                 ScaleDrawingToDpi = false,
                 Gpu = _skiaGpu,
-                CurrentSession =  session
+                CurrentSession = session,
+                // SkiaSharp cannot report or restore a D3D12 surface's state after readback.
+                DisableSurfaceAccess = session.GrContext.Backend == GRBackend.Direct3D
             };
+
+            if (session is ISkiaGpuRenderSessionWithOffset offsetSession)
+                nfo.SurfaceOffset = offsetSession.Offset;
 
             return new DrawingContextImpl(nfo, session);
         }

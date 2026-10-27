@@ -139,7 +139,7 @@ namespace Avalonia.Skia
         {
             var context = (DrawingContextImpl)contextImpl;
 
-            if (_surface.CanBlit)
+            if (_surface.CanBlit && context.SurfaceOffset == default)
             {
                 _surface.Surface.Canvas.Flush();
                 _surface.Blit(context.Canvas);
@@ -147,9 +147,16 @@ namespace Avalonia.Skia
             else
             {
                 var oldMatrix = context.Canvas.TotalMatrix;
-                context.Canvas.ResetMatrix();
-                _surface.Surface.Draw(context.Canvas, 0, 0, null);
-                context.Canvas.SetMatrix(oldMatrix);
+                try
+                {
+                    // Layers already contain device pixels; only the destination origin is applied.
+                    context.Canvas.ResetMatrix();
+                    _surface.Surface.Draw(context.Canvas, context.SurfaceOffset.X, context.SurfaceOffset.Y, null);
+                }
+                finally
+                {
+                    context.Canvas.SetMatrix(oldMatrix);
+                }
             }
         }
 

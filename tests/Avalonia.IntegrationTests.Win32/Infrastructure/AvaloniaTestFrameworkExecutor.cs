@@ -22,6 +22,8 @@ internal sealed class AvaloniaTestFrameworkExecutor(IXunitTestAssembly testAssem
         Randomizer.Seed = seed == int.MinValue ? int.MaxValue : Math.Abs(seed);
         var executor = new XunitTestFrameworkExecutor(testAssembly);
 
+        // Enable before any test creates a device; enabling it on a live device removes that device.
+        D3D12DebugLayer.Enable();
         var dispatcher = await AppManager.EnsureAppInitializedAsync().ConfigureAwait(false);
 
         try

@@ -11,7 +11,7 @@ using MicroCom.Runtime;
 
 namespace Avalonia.Win32.WinRT.Composition;
 
-internal class WinUiCompositedWindow : ISwapchainVisualHost, IDisposable
+internal class WinUiCompositedWindow : ISwapchainVisualHost
 {
     public EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo WindowInfo { get; }
     private readonly WinUiCompositionShared _shared;
@@ -25,11 +25,15 @@ internal class WinUiCompositedWindow : ISwapchainVisualHost, IDisposable
     private readonly ICompositionSurfaceBrush _surfaceBrush;
     private readonly ICompositionTarget _target;
     private ICompositionSurface? _swapchainSurface;
+    private bool _disposed;
 
     public void Dispose()
     {
         lock (_shared.SyncRoot)
         {
+            if (_disposed)
+                return;
+            _disposed = true;
             _swapchainSurface?.Dispose();
             _compositionRoundedRectangleGeometry?.Dispose();
             _blur.Dispose();
@@ -85,14 +89,16 @@ internal class WinUiCompositedWindow : ISwapchainVisualHost, IDisposable
         _target.SetRoot(containerVisual);
     }
 
-    public void SetSurface(ICompositionSurface surface) => _surfaceBrush.SetSurface(surface);
+    public void SetSurface(ICompositionSurface? surface) => _surfaceBrush.SetSurface(surface);
 
-    public void SetSwapchainContent(IUnknown swapchain)
+    public void SetSwapchainContent(IUnknown? swapchain)
     {
+        if (_disposed && swapchain is null)
+            return;
         Debug.Assert(Monitor.IsEntered(_shared.SyncRoot));
 
         using var interop = _shared.Compositor.QueryInterface<ICompositorInterop>();
-        var surface = interop.CreateCompositionSurfaceForSwapChain(swapchain);
+        var surface = swapchain is null ? null : interop.CreateCompositionSurfaceForSwapChain(swapchain);
         _surfaceBrush.SetSurface(surface);
         _swapchainSurface?.Dispose();
         _swapchainSurface = surface;
