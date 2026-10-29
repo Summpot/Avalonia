@@ -29,11 +29,14 @@ internal class WinUiCompositionShared : IDisposable
     
     public void Dispose()
     {
-        BlurBrush.Dispose();
-        MicaBrushLight?.Dispose();
-        MicaBrushDark?.Dispose();
-        DesktopInterop.Dispose();
-        Compositor.Dispose();
-        Compositor5.Dispose();
+        using var compositor = Compositor;
+        using var compositor5 = Compositor5;
+        using var desktopInterop = DesktopInterop;
+        using var blurBrush = BlurBrush;
+        using var micaLight = MicaBrushLight;
+        using var micaDark = MicaBrushDark;
+        // Closing the compositor completes its native work before its dispatcher queue is shut down.
+        using var closable = compositor.QueryInterface<IClosable>();
+        closable.Close();
     }
 }

@@ -41,6 +41,9 @@ namespace Avalonia.Skia
                 CurrentSession =  session
             };
 
+            if (session is ISkiaGpuRenderSessionWithOffset offsetSession)
+                nfo.PostTransform = Matrix.CreateTranslation(offsetSession.Offset.X, offsetSession.Offset.Y);
+
             return new DrawingContextImpl(nfo, session);
         }
         

@@ -180,7 +180,11 @@ namespace Avalonia.Win32
             _storageProvider = new Win32StorageProvider(this);
             _inputPane = WindowsInputPane.TryCreate(this);
             _nativeControlHost = new Win32NativeControlHost(this, !UseRedirectionBitmap);
-            _defaultTransparencyLevel = UseRedirectionBitmap ? WindowTransparencyLevel.None : WindowTransparencyLevel.Transparent;
+            // Composition surfaces without a redirection bitmap are transparent by default;
+            // the opaque HWND swapchain has no way to show anything behind the window.
+            _defaultTransparencyLevel = !UseRedirectionBitmap && _glSurface is ICompositionEffectsSurface
+                ? WindowTransparencyLevel.Transparent
+                : WindowTransparencyLevel.None;
             _transparencyLevel = _defaultTransparencyLevel;
 
             lock (s_instances)
@@ -421,6 +425,12 @@ namespace Avalonia.Win32
 
         private bool IsSupported(WindowTransparencyLevel level)
         {
+            // The opaque HWND swapchain only supports None; every other level needs a composition surface.
+            if (!UseRedirectionBitmap && _glSurface is not ICompositionEffectsSurface)
+            {
+                return level == WindowTransparencyLevel.None;
+            }
+
             // None is only supported with redirection bitmap.
             // Note, it's still possible to have non-transparent window with a fallback background brush.
             if (level == WindowTransparencyLevel.None)

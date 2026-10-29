@@ -23,6 +23,7 @@
       "src\\Avalonia.DesignerSupport\\Avalonia.DesignerSupport.csproj",
       "src\\Avalonia.Desktop\\Avalonia.Desktop.csproj",
       "src\\Avalonia.Dialogs\\Avalonia.Dialogs.csproj",
+      "src\\Avalonia.Direct3D12\\Avalonia.Direct3D12.csproj",
       "src\\Avalonia.Fonts.Inter\\Avalonia.Fonts.Inter.csproj",
       "src\\Avalonia.FreeDesktop.AtSpi\\Avalonia.FreeDesktop.AtSpi.csproj",
       "src\\Avalonia.FreeDesktop\\Avalonia.FreeDesktop.csproj",
