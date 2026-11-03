@@ -97,9 +97,23 @@ public static class KnownPlatformGraphicsExternalImageHandleTypes
     /// </summary>
     public const string D3D11TextureGlobalSharedHandle = nameof(D3D11TextureGlobalSharedHandle);
     /// <summary>
-    /// A DXGI NT handle returned by IDXGIResource1::CreateSharedHandle for a texture created with D3D11_RESOURCE_MISC_SHARED_NTHANDLE or flag
+    /// A DXGI NT handle returned by IDXGIResource1::CreateSharedHandle for a texture created with D3D11_RESOURCE_MISC_SHARED_NTHANDLE.
     /// </summary>
+    /// <remarks>
+    /// The D3D12 backend requires a single-sample, single-mip RGBA8 or BGRA8 render target on the same
+    /// adapter. Flush producer writes before signaling the acquire timeline fence and wait for the
+    /// release fence before reuse. Keyed-mutex synchronization is not supported by that backend.
+    /// </remarks>
     public const string D3D11TextureNtHandle = nameof(D3D11TextureNtHandle);
+
+    /// <summary>
+    /// An NT handle exported by ID3D12Device::CreateSharedHandle for a committed 2D texture.
+    /// The D3D12 backend accepts single-sample, single-mip RGBA8 or BGRA8 render targets on the
+    /// same adapter. The producer must transition the resource to COMMON before signaling the
+    /// acquire fence and wait for the release fence before reusing it. Avalonia returns it in COMMON.
+    /// </summary>
+    public const string Direct3D12TextureNtHandle = nameof(Direct3D12TextureNtHandle);
+
     /// <summary>
     /// A POSIX file descriptor that's exported by Vulkan using VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT or in a compatible way
     /// </summary>

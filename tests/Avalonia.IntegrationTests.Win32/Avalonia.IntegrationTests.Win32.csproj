@@ -5,6 +5,7 @@
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseMicroComGeneratorRoslyn>true</UseMicroComGeneratorRoslyn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +15,10 @@
     <ProjectReference Include="../../src/Avalonia.Themes.Fluent/Avalonia.Themes.Fluent.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <MicroComIdl Include="Direct3D12Tests.idl" />
+  </ItemGroup>
+  <Import Project="../../build/MicroCOM.props" />
   <Import Project="../../build/XUnit.props" />
   <Import Project="../../build/SharedVersion.props" />
   <Import Project="../../build/ReferenceCoreLibraries.props" />

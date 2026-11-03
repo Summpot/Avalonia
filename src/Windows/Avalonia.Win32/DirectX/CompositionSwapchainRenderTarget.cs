@@ -9,16 +9,16 @@ namespace Avalonia.Win32.DirectX;
 /// <summary>
 /// A composed window that can display a DXGI swapchain as its content.
 /// </summary>
-internal interface ISwapchainVisualHost
+internal interface ISwapchainVisualHost : IDisposable
 {
     EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo WindowInfo { get; }
     IDisposable BeginTransaction();
 
     /// <summary>
-    /// Attaches the swapchain as the content of the window's visual.
-    /// Called with the transaction held, only when the swapchain is (re)created.
+    /// Sets or clears the window's swapchain content while the transaction is held.
+    /// Clearing content is also allowed after the host has been disposed.
     /// </summary>
-    void SetSwapchainContent(IUnknown swapchain);
+    void SetSwapchainContent(IUnknown? swapchain);
 
     void ResizeIfNeeded(PixelSize size);
     void ApplyEffects(CompositionTransparencyLevel transparencyLevel, PlatformThemeVariant themeVariant);

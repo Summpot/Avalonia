@@ -1,0 +1,421 @@
+@clr-namespace Avalonia.Win32.DirectX
+@clr-access internal
+@clr-map Guid System.Guid
+@clr-map D3D11_RESOURCE_FLAGS Avalonia.Win32.Direct3D12.D3D12Interop.D3D11_RESOURCE_FLAGS
+@clr-map D3D12_COMMAND_QUEUE_DESC Avalonia.Win32.Direct3D12.D3D12Interop.D3D12_COMMAND_QUEUE_DESC
+@clr-map D3D12_HEAP_PROPERTIES Avalonia.Win32.Direct3D12.D3D12Interop.D3D12_HEAP_PROPERTIES
+@clr-map D3D12_RESOURCE_BARRIER Avalonia.Win32.Direct3D12.D3D12Interop.D3D12_RESOURCE_BARRIER
+@clr-map D3D12_RESOURCE_DESC Avalonia.Win32.Direct3D12.D3D12Interop.D3D12_RESOURCE_DESC
+
+// Windows SDK COM interfaces through the last method used by the D3D12 backend.
+// Opaque pointers represent structures and interfaces that this backend does not inspect.
+
+[uuid(c4fec28f-7966-4e95-9f94-f431cb56c3b8)]
+interface ID3D12Object : IUnknown
+{
+    int GetPrivateData(Guid* guid, uint* pDataSize, void* pData);
+    int SetPrivateData(Guid* guid, uint DataSize, void* pData);
+    int SetPrivateDataInterface(Guid* guid, void* pData);
+    int SetName(ushort* Name);
+}
+
+[uuid(905db94b-a00c-4140-9df5-2b64ca9ea357)]
+interface ID3D12DeviceChild : ID3D12Object
+{
+    int GetDevice(Guid* riid, void** ppvDevice);
+}
+
+[uuid(63ee58fb-1268-4835-86da-f008ce62f0d6)]
+interface ID3D12Pageable : ID3D12DeviceChild
+{
+}
+
+[uuid(189819f1-1db6-4b57-be54-1821339b85f7)]
+interface ID3D12Device : ID3D12Object
+{
+    uint GetNodeCount();
+    int CreateCommandQueue(D3D12_COMMAND_QUEUE_DESC* pDesc, Guid* riid, void** ppCommandQueue);
+    int CreateCommandAllocator(uint type, Guid* riid, void** ppCommandAllocator);
+    int CreateGraphicsPipelineState(void* pDesc, Guid* riid, void** ppPipelineState);
+    int CreateComputePipelineState(void* pDesc, Guid* riid, void** ppPipelineState);
+    int CreateCommandList(
+        uint nodeMask,
+        uint type,
+        void* pCommandAllocator,
+        void* pInitialState,
+        Guid* riid,
+        void** ppCommandList);
+    int CheckFeatureSupport(uint Feature, void* pFeatureSupportData, uint FeatureSupportDataSize);
+    int CreateDescriptorHeap(void* pDescriptorHeapDesc, Guid* riid, void** ppvHeap);
+    uint GetDescriptorHandleIncrementSize(uint DescriptorHeapType);
+    int CreateRootSignature(
+        uint nodeMask,
+        void* pBlobWithRootSignature,
+        IntPtr blobLengthInBytes,
+        Guid* riid,
+        void** ppvRootSignature);
+    void CreateConstantBufferView(void* pDesc, IntPtr DestDescriptor);
+    void CreateShaderResourceView(void* pResource, void* pDesc, IntPtr DestDescriptor);
+    void CreateUnorderedAccessView(void* pResource, void* pCounterResource, void* pDesc, IntPtr DestDescriptor);
+    void CreateRenderTargetView(void* pResource, void* pDesc, IntPtr DestDescriptor);
+    void CreateDepthStencilView(void* pResource, void* pDesc, IntPtr DestDescriptor);
+    void CreateSampler(void* pDesc, IntPtr DestDescriptor);
+    void CopyDescriptors(
+        uint NumDestDescriptorRanges,
+        void* pDestDescriptorRangeStarts,
+        uint* pDestDescriptorRangeSizes,
+        uint NumSrcDescriptorRanges,
+        void* pSrcDescriptorRangeStarts,
+        uint* pSrcDescriptorRangeSizes,
+        uint DescriptorHeapsType);
+    void CopyDescriptorsSimple(
+        uint NumDescriptors,
+        IntPtr DestDescriptorRangeStart,
+        IntPtr SrcDescriptorRangeStart,
+        uint DescriptorHeapsType);
+    void GetResourceAllocationInfo(
+        void* result,
+        uint visibleMask,
+        uint numResourceDescs,
+        D3D12_RESOURCE_DESC* pResourceDescs);
+    void GetCustomHeapProperties(D3D12_HEAP_PROPERTIES* result, uint nodeMask, uint heapType);
+    int CreateCommittedResource(
+        D3D12_HEAP_PROPERTIES* pHeapProperties,
+        uint HeapFlags,
+        D3D12_RESOURCE_DESC* pDesc,
+        uint InitialResourceState,
+        void* pOptimizedClearValue,
+        Guid* riidResource,
+        void** ppvResource);
+    int CreateHeap(void* pDesc, Guid* riid, void** ppvHeap);
+    int CreatePlacedResource(
+        void* pHeap,
+        ulong HeapOffset,
+        D3D12_RESOURCE_DESC* pDesc,
+        uint InitialState,
+        void* pOptimizedClearValue,
+        Guid* riid,
+        void** ppvResource);
+    int CreateReservedResource(
+        D3D12_RESOURCE_DESC* pDesc,
+        uint InitialState,
+        void* pOptimizedClearValue,
+        Guid* riid,
+        void** ppvResource);
+    int CreateSharedHandle(void* pObject, void* pAttributes, uint Access, ushort* Name, IntPtr* pHandle);
+    int OpenSharedHandle(IntPtr NTHandle, Guid* riid, void** ppvObj);
+    int OpenSharedHandleByName(ushort* Name, uint Access, IntPtr* pNTHandle);
+    int MakeResident(uint NumObjects, void** ppObjects);
+    int Evict(uint NumObjects, void** ppObjects);
+    int CreateFence(ulong InitialValue, uint Flags, Guid* riid, void** ppFence);
+    int GetDeviceRemovedReason();
+}
+
+[uuid(0ec870a6-5d7e-4c22-8cfc-5baae07616ed)]
+interface ID3D12CommandQueue : ID3D12Pageable
+{
+    void UpdateTileMappings(
+        void* pResource,
+        uint NumResourceRegions,
+        void* pResourceRegionStartCoordinates,
+        void* pResourceRegionSizes,
+        void* pHeap,
+        uint NumRanges,
+        void* pRangeFlags,
+        uint* pHeapRangeStartOffsets,
+        uint* pRangeTileCounts,
+        uint Flags);
+    void CopyTileMappings(
+        void* pDstResource,
+        void* pDstRegionStartCoordinate,
+        void* pSrcResource,
+        void* pSrcRegionStartCoordinate,
+        void* pRegionSize,
+        uint Flags);
+    void ExecuteCommandLists(uint NumCommandLists, void** ppCommandLists);
+    void SetMarker(uint Metadata, void* pData, uint Size);
+    void BeginEvent(uint Metadata, void* pData, uint Size);
+    void EndEvent();
+    int Signal(void* pFence, ulong Value);
+    int Wait(void* pFence, ulong Value);
+}
+
+[uuid(6102dee4-af59-4b09-b999-b44d73f09b24)]
+interface ID3D12CommandAllocator : ID3D12Pageable
+{
+    int Reset();
+}
+
+[uuid(7116d91c-e7e4-47ce-b8c6-ec8168f437e5)]
+interface ID3D12CommandList : ID3D12DeviceChild
+{
+    uint GetType();
+}
+
+[uuid(5b160d0f-ac1b-4185-8ba8-b3ae42a5a455)]
+interface ID3D12GraphicsCommandList : ID3D12CommandList
+{
+    int Close();
+    int Reset(void* pAllocator, void* pInitialState);
+    void ClearState(void* pPipelineState);
+    void DrawInstanced(
+        uint VertexCountPerInstance,
+        uint InstanceCount,
+        uint StartVertexLocation,
+        uint StartInstanceLocation);
+    void DrawIndexedInstanced(
+        uint IndexCountPerInstance,
+        uint InstanceCount,
+        uint StartIndexLocation,
+        int BaseVertexLocation,
+        uint StartInstanceLocation);
+    void Dispatch(uint ThreadGroupCountX, uint ThreadGroupCountY, uint ThreadGroupCountZ);
+    void CopyBufferRegion(void* pDstBuffer, ulong DstOffset, void* pSrcBuffer, ulong SrcOffset, ulong NumBytes);
+    void CopyTextureRegion(void* pDst, uint DstX, uint DstY, uint DstZ, void* pSrc, void* pSrcBox);
+    void CopyResource(void* pDstResource, void* pSrcResource);
+    void CopyTiles(
+        void* pTiledResource,
+        void* pTileRegionStartCoordinate,
+        void* pTileRegionSize,
+        void* pBuffer,
+        ulong BufferStartOffsetInBytes,
+        uint Flags);
+    void ResolveSubresource(
+        void* pDstResource,
+        uint DstSubresource,
+        void* pSrcResource,
+        uint SrcSubresource,
+        uint Format);
+    void IASetPrimitiveTopology(uint PrimitiveTopology);
+    void RSSetViewports(uint NumViewports, void* pViewports);
+    void RSSetScissorRects(uint NumRects, void* pRects);
+    void OMSetBlendFactor(float* BlendFactor);
+    void OMSetStencilRef(uint StencilRef);
+    void SetPipelineState(void* pPipelineState);
+    void ResourceBarrier(uint NumBarriers, D3D12_RESOURCE_BARRIER* pBarriers);
+}
+
+[uuid(0a753dcf-c4d8-4b91-adf6-be5a60d95a76)]
+interface ID3D12Fence : ID3D12Pageable
+{
+    ulong GetCompletedValue();
+    int SetEventOnCompletion(ulong Value, IntPtr hEvent);
+    int Signal(ulong Value);
+}
+
+[uuid(696442be-a72e-4059-bc79-5b5c98040fad)]
+interface ID3D12Resource : ID3D12Pageable
+{
+    int Map(uint Subresource, void* pReadRange, void** ppData);
+    void Unmap(uint Subresource, void* pWrittenRange);
+    void GetDesc(D3D12_RESOURCE_DESC* result);
+}
+
+[uuid(1841e5c8-16b0-489b-bcc8-44cfb0d5deae)]
+interface ID3D11DeviceChild : IUnknown
+{
+    void GetDevice(void** ppDevice);
+    int GetPrivateData(Guid* guid, uint* pDataSize, void* pData);
+    int SetPrivateData(Guid* guid, uint DataSize, void* pData);
+    int SetPrivateDataInterface(Guid* guid, void* pData);
+}
+
+[uuid(c0bfa96c-e089-44fb-8eaf-26f8796190da)]
+interface ID3D11DeviceContext : ID3D11DeviceChild
+{
+    void VSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void PSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void PSSetShader(void* pPixelShader, void** ppClassInstances, uint NumClassInstances);
+    void PSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void VSSetShader(void* pVertexShader, void** ppClassInstances, uint NumClassInstances);
+    void DrawIndexed(uint IndexCount, uint StartIndexLocation, int BaseVertexLocation);
+    void Draw(uint VertexCount, uint StartVertexLocation);
+    int Map(void* pResource, uint Subresource, uint MapType, uint MapFlags, void* pMappedResource);
+    void Unmap(void* pResource, uint Subresource);
+    void PSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void IASetInputLayout(void* pInputLayout);
+    void IASetVertexBuffers(uint StartSlot, uint NumBuffers, void** ppVertexBuffers, uint* pStrides, uint* pOffsets);
+    void IASetIndexBuffer(void* pIndexBuffer, uint Format, uint Offset);
+    void DrawIndexedInstanced(
+        uint IndexCountPerInstance,
+        uint InstanceCount,
+        uint StartIndexLocation,
+        int BaseVertexLocation,
+        uint StartInstanceLocation);
+    void DrawInstanced(
+        uint VertexCountPerInstance,
+        uint InstanceCount,
+        uint StartVertexLocation,
+        uint StartInstanceLocation);
+    void GSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void GSSetShader(void* pShader, void** ppClassInstances, uint NumClassInstances);
+    void IASetPrimitiveTopology(uint Topology);
+    void VSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void VSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void Begin(void* pAsync);
+    void End(void* pAsync);
+    int GetData(void* pAsync, void* pData, uint DataSize, uint GetDataFlags);
+    void SetPredication(void* pPredicate, int PredicateValue);
+    void GSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void GSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void OMSetRenderTargets(uint NumViews, void** ppRenderTargetViews, void* pDepthStencilView);
+    void OMSetRenderTargetsAndUnorderedAccessViews(
+        uint NumRTVs,
+        void** ppRenderTargetViews,
+        void* pDepthStencilView,
+        uint UAVStartSlot,
+        uint NumUAVs,
+        void** ppUnorderedAccessViews,
+        uint* pUAVInitialCounts);
+    void OMSetBlendState(void* pBlendState, float* BlendFactor, uint SampleMask);
+    void OMSetDepthStencilState(void* pDepthStencilState, uint StencilRef);
+    void SOSetTargets(uint NumBuffers, void** ppSOTargets, uint* pOffsets);
+    void DrawAuto();
+    void DrawIndexedInstancedIndirect(void* pBufferForArgs, uint AlignedByteOffsetForArgs);
+    void DrawInstancedIndirect(void* pBufferForArgs, uint AlignedByteOffsetForArgs);
+    void Dispatch(uint ThreadGroupCountX, uint ThreadGroupCountY, uint ThreadGroupCountZ);
+    void DispatchIndirect(void* pBufferForArgs, uint AlignedByteOffsetForArgs);
+    void RSSetState(void* pRasterizerState);
+    void RSSetViewports(uint NumViewports, void* pViewports);
+    void RSSetScissorRects(uint NumRects, void* pRects);
+    void CopySubresourceRegion(
+        void* pDstResource,
+        uint DstSubresource,
+        uint DstX,
+        uint DstY,
+        uint DstZ,
+        void* pSrcResource,
+        uint SrcSubresource,
+        void* pSrcBox);
+    void CopyResource(void* pDstResource, void* pSrcResource);
+    void UpdateSubresource(
+        void* pDstResource,
+        uint DstSubresource,
+        void* pDstBox,
+        void* pSrcData,
+        uint SrcRowPitch,
+        uint SrcDepthPitch);
+    void CopyStructureCount(void* pDstBuffer, uint DstAlignedByteOffset, void* pSrcView);
+    void ClearRenderTargetView(void* pRenderTargetView, float* ColorRGBA);
+    void ClearUnorderedAccessViewUint(void* pUnorderedAccessView, uint* Values);
+    void ClearUnorderedAccessViewFloat(void* pUnorderedAccessView, float* Values);
+    void ClearDepthStencilView(void* pDepthStencilView, uint ClearFlags, float Depth, byte Stencil);
+    void GenerateMips(void* pShaderResourceView);
+    void SetResourceMinLOD(void* pResource, float MinLOD);
+    float GetResourceMinLOD(void* pResource);
+    void ResolveSubresource(
+        void* pDstResource,
+        uint DstSubresource,
+        void* pSrcResource,
+        uint SrcSubresource,
+        uint Format);
+    void ExecuteCommandList(void* pCommandList, int RestoreContextState);
+    void HSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void HSSetShader(void* pHullShader, void** ppClassInstances, uint NumClassInstances);
+    void HSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void HSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void DSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void DSSetShader(void* pDomainShader, void** ppClassInstances, uint NumClassInstances);
+    void DSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void DSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void CSSetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void CSSetUnorderedAccessViews(
+        uint StartSlot,
+        uint NumUAVs,
+        void** ppUnorderedAccessViews,
+        uint* pUAVInitialCounts);
+    void CSSetShader(void* pComputeShader, void** ppClassInstances, uint NumClassInstances);
+    void CSSetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void CSSetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void VSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void PSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void PSGetShader(void** ppPixelShader, void** ppClassInstances, uint* pNumClassInstances);
+    void PSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void VSGetShader(void** ppVertexShader, void** ppClassInstances, uint* pNumClassInstances);
+    void PSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void IAGetInputLayout(void** ppInputLayout);
+    void IAGetVertexBuffers(uint StartSlot, uint NumBuffers, void** ppVertexBuffers, uint* pStrides, uint* pOffsets);
+    void IAGetIndexBuffer(void** pIndexBuffer, void* Format, uint* Offset);
+    void GSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void GSGetShader(void** ppGeometryShader, void** ppClassInstances, uint* pNumClassInstances);
+    void IAGetPrimitiveTopology(void* pTopology);
+    void VSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void VSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void GetPredication(void** ppPredicate, int* pPredicateValue);
+    void GSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void GSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void OMGetRenderTargets(uint NumViews, void** ppRenderTargetViews, void** ppDepthStencilView);
+    void OMGetRenderTargetsAndUnorderedAccessViews(
+        uint NumRTVs,
+        void** ppRenderTargetViews,
+        void** ppDepthStencilView,
+        uint UAVStartSlot,
+        uint NumUAVs,
+        void** ppUnorderedAccessViews);
+    void OMGetBlendState(void** ppBlendState, float* BlendFactor, uint* pSampleMask);
+    void OMGetDepthStencilState(void** ppDepthStencilState, uint* pStencilRef);
+    void SOGetTargets(uint NumBuffers, void** ppSOTargets);
+    void RSGetState(void** ppRasterizerState);
+    void RSGetViewports(uint* pNumViewports, void* pViewports);
+    void RSGetScissorRects(uint* pNumRects, void* pRects);
+    void HSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void HSGetShader(void** ppHullShader, void** ppClassInstances, uint* pNumClassInstances);
+    void HSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void HSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void DSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void DSGetShader(void** ppDomainShader, void** ppClassInstances, uint* pNumClassInstances);
+    void DSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void DSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void CSGetShaderResources(uint StartSlot, uint NumViews, void** ppShaderResourceViews);
+    void CSGetUnorderedAccessViews(uint StartSlot, uint NumUAVs, void** ppUnorderedAccessViews);
+    void CSGetShader(void** ppComputeShader, void** ppClassInstances, uint* pNumClassInstances);
+    void CSGetSamplers(uint StartSlot, uint NumSamplers, void** ppSamplers);
+    void CSGetConstantBuffers(uint StartSlot, uint NumBuffers, void** ppConstantBuffers);
+    void ClearState();
+    void Flush();
+}
+
+[uuid(85611e73-70a9-490e-9614-a9e302777904)]
+interface ID3D11On12Device : IUnknown
+{
+    int CreateWrappedResource(
+        void* pResource12,
+        D3D11_RESOURCE_FLAGS* pFlags11,
+        uint InState,
+        uint OutState,
+        Guid* riid,
+        void** ppResource11);
+    void ReleaseWrappedResources(void** ppResources, uint NumResources);
+    void AcquireWrappedResources(void** ppResources, uint NumResources);
+}
+
+[uuid(bdb64df4-ea2f-4c70-b861-aaab1258bb5d)]
+interface ID3D11On12Device1 : ID3D11On12Device
+{
+    int GetD3D12Device(Guid* riid, void** ppvDevice);
+}
+
+[uuid(dc90f331-4740-43fa-866e-67f12cb58223)]
+interface ID3D11On12Device2 : ID3D11On12Device1
+{
+    int UnwrapUnderlyingResource(void* pResource11, void* pCommandQueue, Guid* riid, void** ppvResource12);
+    int ReturnUnderlyingResource(void* pResource11, uint NumSync, ulong* pSignalValues, void** ppFences);
+}
+
+[uuid(a8be2ac4-199f-4946-b331-79599fb98de7)]
+interface IDXGISwapChain2 : IDXGISwapChain1
+{
+    int SetSourceSize(uint Width, uint Height);
+    int GetSourceSize(uint* pWidth, uint* pHeight);
+    int SetMaximumFrameLatency(uint MaxLatency);
+    int GetMaximumFrameLatency(uint* pMaxLatency);
+    IntPtr GetFrameLatencyWaitableObject();
+    int SetMatrixTransform(void* pMatrix);
+    int GetMatrixTransform(void* pMatrix);
+}
+
+[uuid(94d99bdb-f1f8-4ab0-b236-7da0170edab1)]
+interface IDXGISwapChain3 : IDXGISwapChain2
+{
+    uint GetCurrentBackBufferIndex();
+}

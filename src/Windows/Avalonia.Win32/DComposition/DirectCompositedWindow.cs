@@ -9,18 +9,22 @@ using MicroCom.Runtime;
 
 namespace Avalonia.Win32.DComposition;
 
-internal class DirectCompositedWindow : ISwapchainVisualHost, IDisposable
+internal class DirectCompositedWindow : ISwapchainVisualHost
 {
     private readonly DirectCompositionShared _shared;
     public EglGlPlatformSurface.IEglWindowGlPlatformSurfaceInfo WindowInfo { get; }
     private readonly IDCompositionVisual _container;
     private readonly IDCompositionTarget _target;
     private readonly IDCompositionDevice2 _device;
+    private bool _disposed;
 
     public void Dispose()
     {
         lock (_shared.SyncRoot)
         {
+            if (_disposed)
+                return;
+            _disposed = true;
             _container.Dispose();
             _target.Dispose();
             _device.Dispose();
@@ -42,9 +46,13 @@ internal class DirectCompositedWindow : ISwapchainVisualHost, IDisposable
         _target.SetRoot(container);
     }
 
-    public void SetSurface(IDCompositionSurface surface) => _container.SetContent(surface);
+    public void SetSurface(IDCompositionSurface? surface) => _container.SetContent(surface);
 
-    public void SetSwapchainContent(IUnknown swapchain) => _container.SetContent(swapchain);
+    public void SetSwapchainContent(IUnknown? swapchain)
+    {
+        if (!_disposed || swapchain is not null)
+            _container.SetContent(swapchain);
+    }
 
     // A DComp visual displays its content at native size, nothing to resize
     public void ResizeIfNeeded(PixelSize size)
@@ -61,8 +69,15 @@ internal class DirectCompositedWindow : ISwapchainVisualHost, IDisposable
         Monitor.Enter(_shared.SyncRoot);
         return Disposable.Create(() =>
         {
-            _device.Commit();
-            Monitor.Exit(_shared.SyncRoot);
+            try
+            {
+                if (!_disposed)
+                    _device.Commit();
+            }
+            finally
+            {
+                Monitor.Exit(_shared.SyncRoot);
+            }
         });
     }
 }

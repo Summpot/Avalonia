@@ -1,0 +1,19 @@
+@clr-namespace Avalonia.IntegrationTests.Win32
+@clr-access internal
+
+[uuid(344488b7-6846-474b-b989-f027448245e0)]
+interface ID3D12Debug : IUnknown
+{
+    void EnableDebugLayer();
+}
+
+[uuid(0742a90b-c387-483f-b946-30a7e4e61458)]
+interface ID3D12InfoQueue : IUnknown
+{
+    int SetMessageCountLimit(ulong limit);
+    void ClearStoredMessages();
+    int GetMessage(ulong index, void* message, IntPtr* size);
+    ulong GetNumMessagesAllowedByStorageFilter();
+    ulong GetNumMessagesDeniedByStorageFilter();
+    ulong GetNumStoredMessages();
+}
